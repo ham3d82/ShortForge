@@ -1,0 +1,78 @@
+# ─── Python ───────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+*.whl
+
+# ─── Node / Frontend ─────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/build/
+*.tsbuildinfo
+.next/
+
+# ─── IDE / Editor ────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── Environment & Secrets ──────────────────────────
+.env
+.env.local
+.env.production
+*.pem
+*.key
+service-account.json
+
+# ─── Media / Output ─────────────────────────────────
+backend/media/output/
+backend/media/temp/
+*.mp4
+*.wav
+*.mp3
+*.srt
+*.ass
+
+# ─── Database ───────────────────────────────────────
+*.db
+*.sqlite3
+backend/infrastructure/db/migrations/versions/*.py
+!backend/infrastructure/db/migrations/versions/.gitkeep
+
+# ─── Logs ───────────────────────────────────────────
+logs/
+*.log
+*.log.*
+
+# ─── Docker ─────────────────────────────────────────
+docker/data/
+docker/volumes/
+
+# ─── Testing ────────────────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
+coverage.xml
+*.coverage
+
+# ─── OS ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Misc ───────────────────────────────────────────
+*.bak
+*.tmp
+.cache/

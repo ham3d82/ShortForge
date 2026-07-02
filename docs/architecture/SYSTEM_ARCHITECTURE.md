@@ -1,0 +1,717 @@
+# ShortForge — System Architecture
+
+> **Author**: Principal Software Architect  
+> **Version**: 1.0.0  
+> **Last Updated**: 2026-07-02
+
+---
+
+## Table of Contents
+
+1. [Architecture Philosophy](#1-architecture-philosophy)
+2. [System Context Diagram](#2-system-context-diagram)
+3. [Container Diagram](#3-container-diagram)
+4. [Component Diagram](#4-component-diagram)
+5. [Deployment Architecture](#5-deployment-architecture)
+6. [Technology Stack](#6-technology-stack)
+7. [Cross-Cutting Concerns](#7-cross-cutting-concerns)
+8. [Scalability & Performance](#8-scalability--performance)
+9. [Security Architecture](#9-security-architecture)
+10. [Observability](#10-observability)
+
+---
+
+## 1. Architecture Philosophy
+
+ShortForge follows **Clean Architecture** (Robert C. Martin) with **Domain-Driven Design** tactical patterns. The guiding principles are:
+
+| Principle | Application |
+|-----------|-------------|
+| **Dependency Inversion** | Domain defines interfaces; Infrastructure implements them |
+| **Separation of Concerns** | Each layer has a single, well-defined responsibility |
+| **Ports & Adapters** | Application core is framework-agnostic; adapters plug in |
+| **CQRS-lite** | Read models are optimized for queries; Commands for mutations |
+| **Event-Driven** | Async events for pipeline state transitions |
+| **Provider Abstraction** | AI, TTS, Storage providers are swappable via strategy pattern |
+
+### Layer Dependency Rules
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     API Layer (FastAPI)                       │
+│  Routes → Middleware → Dependencies → Controllers            │
+├─────────────────────────────────────────────────────────────┤
+│                  Application Layer                            │
+│  Use Cases → Services → Ports (Interfaces) → DTOs           │
+├─────────────────────────────────────────────────────────────┤
+│                   Domain Layer                                │
+│  Entities → Value Objects → Enums → Domain Events            │
+├─────────────────────────────────────────────────────────────┤
+│                Infrastructure Layer                           │
+│  Repositories → DB Models → Queue → Storage → External APIs  │
+├─────────────────────────────────────────────────────────────┤
+│              AI / Media / Worker Layers                       │
+│  Agents → Pipeline → Processors → Tasks                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Critical Rule**: Domain Layer must have ZERO imports from any other layer. Application Layer may only depend on Domain. Infrastructure depends on Application (interfaces). API depends on Application.
+
+---
+
+## 2. System Context Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        ShortForge System                         │
+│                                                                   │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────────┐  │
+│  │  Creator  │   │  Admin   │   │ YouTube  │   │  3rd Party   │  │
+│  │  (User)   │   │ (Staff)  │   │  API     │   │  AI APIs     │  │
+│  └─────┬─────┘   └─────┬────┘   └────┬─────┘   └──────┬───────┘  │
+│        │               │             │                 │          │
+│        └───────────────┴─────────────┴─────────────────┘          │
+│                            │                                      │
+│                            ▼                                      │
+│              ┌─────────────────────────┐                          │
+│              │     ShortForge System   │                          │
+│              │  (API + Workers + AI)   │                          │
+│              └─────────────────────────┘                          │
+│                            │                                      │
+│                            ▼                                      │
+│              ┌─────────────────────────┐                          │
+│              │   External Services     │                          │
+│              │  ┌─────┐ ┌──────┐ ┌───┐ │                          │
+│              │  │ S3  │ │Redis │ │DB │ │                          │
+│              │  └─────┘ └──────┘ └───┘ │                          │
+│              └─────────────────────────┘                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### External Actors
+
+| Actor | Description | Interactions |
+|-------|-------------|--------------|
+| **Creator** | YouTube content creator | Creates projects, generates scripts, previews videos, publishes |
+| **Admin** | System administrator | Manages users, monitors workers, views analytics |
+| **YouTube API** | Google YouTube Data API v3 | Uploads videos, manages playlists, fetches analytics |
+| **AI Providers** | OpenAI, Anthropic, ElevenLabs, etc. | Script generation, TTS, image generation |
+| **Storage** | S3-compatible (MinIO/AWS) | Stores media files, thumbnails, exports |
+| **Redis** | In-memory data store | Celery broker, caching, rate limiting |
+| **PostgreSQL** | Primary database | All persistent data |
+
+---
+
+## 3. Container Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           ShortForge System                                  │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │                    Frontend (React SPA)                               │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │    │
+│  │  │ Dashboard│ │Generator │ │  Preview │ │  Queue   │ │ Settings │  │    │
+│  │  │  Page    │ │  Wizard  │ │  Player  │ │  Manager │ │  Page    │  │    │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │    │
+│  └──────────────────────────────┬───────────────────────────────────────┘    │
+│                                 │ HTTPS                                      │
+│                                 ▼                                            │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │                    API Gateway (Nginx / Traefik)                      │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │    │
+│  │  │  Rate    │ │  Auth    │ │  CORS    │ │  Logging │ │  Static  │  │    │
+│  │  │  Limiter │ │  Check   │ │  Handler │ │  Request │ │  Files   │  │    │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │    │
+│  └──────────────────────────────┬───────────────────────────────────────┘    │
+│                                 │                                            │
+│                                 ▼                                            │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │                    Backend API (FastAPI)                              │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │    │
+│  │  │  Auth    │ │ Projects │ │  Scripts │ │  Videos  │ │Publishing│  │    │
+│  │  │  Routes  │ │  Routes  │ │  Routes  │ │  Routes  │ │  Routes  │  │    │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │    │
+│  └──────────────────────────────┬───────────────────────────────────────┘    │
+│                                 │                                            │
+│         ┌───────────────────────┼───────────────────────┐                    │
+│         │                       │                       │                    │
+│         ▼                       ▼                       ▼                    │
+│  ┌──────────────┐    ┌──────────────────┐    ┌──────────────────┐           │
+│  │  PostgreSQL  │    │  Celery Worker   │    │  Celery Beat     │           │
+│  │  (Primary)   │    │  (GPU-enabled)   │    │  (Scheduler)     │           │
+│  └──────────────┘    └────────┬─────────┘    └──────────────────┘           │
+│                               │                                             │
+│                               ▼                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │                    Worker Sub-containers                              │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │    │
+│  │  │  Script  │ │  Audio   │ │  Image   │ │  Video   │ │  Caption │  │    │
+│  │  │  Worker  │ │  Worker  │ │  Worker  │ │  Worker  │ │  Worker  │  │    │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                               │                                             │
+│                               ▼                                             │
+│  ┌──────────────┐    ┌──────────────────┐    ┌──────────────────┐           │
+│  │    Redis     │    │  S3 / MinIO      │    │  FFmpeg (GPU)    │           │
+│  │  (Cache+Q)   │    │  (Object Store)  │    │  (Media Proc)    │           │
+│  └──────────────┘    └──────────────────┘    └──────────────────┘           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. Component Diagram
+
+### 4.1 Backend Component Breakdown
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Backend (FastAPI)                                  │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  API Layer                                                           │    │
+│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────────────┐  │    │
+│  │  │ auth_route │ │project_rt  │ │ script_rt  │ │ video_route      │  │    │
+│  │  │ /api/auth  │ │/api/proj   │ │/api/scripts│ │ /api/videos      │  │    │
+│  │  └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └───────┬──────────┘  │    │
+│  │        │              │              │                │             │    │
+│  │  ┌─────┴──────────────┴──────────────┴────────────────┴──────────┐  │    │
+│  │  │                    Middleware Pipeline                          │  │    │
+│  │  │  [Auth] → [RateLimit] → [RequestID] → [Logging] → [Error]    │  │    │
+│  │  └───────────────────────────────────────────────────────────────┘  │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  Application Layer                                                   │    │
+│  │  ┌────────────────┐ ┌────────────────┐ ┌────────────────────────┐   │    │
+│  │  │  Use Cases      │ │  Services      │ │  DTOs / Mappers       │   │    │
+│  │  │  ├─CreateProject│ │  ├─ScriptSvc   │ │  ├─CreateProjectDTO   │   │    │
+│  │  │  ├─GenerateScr  │ │  ├─VideoSvc    │ │  ├─ScriptResponseDTO  │   │    │
+│  │  │  ├─AssembleVid  │ │  ├─PublishSvc  │ │  ├─VideoStatusDTO     │   │    │
+│  │  │  └─PublishToYT  │ │  └─QueueSvc    │ │  └─PublishResultDTO   │   │    │
+│  │  └────────────────┘ └────────────────┘ └────────────────────────┘   │    │
+│  │  ┌──────────────────────────────────────────────────────────────┐   │    │
+│  │  │  Ports (Interfaces)                                          │   │    │
+│  │  │  ├─IScriptRepository  ├─IVideoRepository  ├─IUserRepository  │   │    │
+│  │  │  ├─IAIService        ├─ITTSProvider      ├─IImageProvider   │   │    │
+│  │  │  ├─IStorageProvider  ├─IQueueService     ├─IPublishService  │   │    │
+│  │  │  └─ICaptionService   └─ITranslationService                   │   │    │
+│  │  └──────────────────────────────────────────────────────────────┘   │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  Domain Layer                                                        │    │
+│  │  ┌────────────────┐ ┌────────────────┐ ┌────────────────────────┐   │    │
+│  │  │  Entities       │ │  Value Objects │ │  Enums                 │   │    │
+│  │  │  ├─User         │ │  ├─Email       │ │  ├─ProjectStatus       │   │    │
+│  │  │  ├─Project      │ │  ├─Duration    │ │  ├─GenerationStatus    │   │    │
+│  │  │  ├─Script       │ │  ├─Resolution  │ │  ├─VideoFormat         │   │    │
+│  │  │  ├─Video        │ │  ├─Language    │ │  ├─VoiceStyle          │   │    │
+│  │  │  ├─Voiceover    │ │  ├─YouTubeUrl  │ │  ├─AIModelProvider     │   │    │
+│  │  │  └─Thumbnail    │ │  └─Money      │ │  └─JobStatus           │   │    │
+│  │  └────────────────┘ └────────────────┘ └────────────────────────┘   │    │
+│  │  ┌──────────────────────────────────────────────────────────────┐   │    │
+│  │  │  Domain Events                                               │   │    │
+│  │  │  ├─ScriptGenerated  ├─VideoRendered  ├─PublishSucceeded     │   │    │
+│  │  │  └─GenerationFailed └─ProgressUpdated                        │   │    │
+│  │  └──────────────────────────────────────────────────────────────┘   │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  Infrastructure Layer                                                │    │
+│  │  ┌────────────────┐ ┌────────────────┐ ┌────────────────────────┐   │    │
+│  │  │  DB / Repos     │ │  External Svc  │ │  Queue / Storage      │   │    │
+│  │  │  ├─UserRepo     │ │  ├─OpenAIAdptr │ │  ├─CeleryQueue        │   │    │
+│  │  │  ├─ProjectRepo  │ │  ├─AnthropicAd │ │  ├─S3Storage          │   │    │
+│  │  │  ├─ScriptRepo   │ │  ├─ElevenLabs  │ │  ├─LocalStorage       │   │    │
+│  │  │  ├─VideoRepo    │ │  ├─YouTubeAPI  │ │  └─RedisCache         │   │    │
+│  │  │  └─JobRepo      │ │  └─StabilityAI│ │                       │   │    │
+│  │  └────────────────┘ └────────────────┘ └────────────────────────┘   │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 AI Layer Component Breakdown
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           AI Layer                                           │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  Provider Abstraction (Strategy Pattern)                             │    │
+│  │                                                                       │    │
+│  │  ┌─────────────────────────────────────────────────────────────┐     │    │
+│  │  │                    IAIService (Port)                         │     │    │
+│  │  │  + generate_script(params) → ScriptResult                   │     │    │
+│  │  │  + generate_image(params) → ImageResult                     │     │    │
+│  │  │  + evaluate_quality(params) → QualityScore                  │     │    │
+│  │  │  + translate_text(params) → TranslationResult               │     │    │
+│  │  └─────────────────────────────────────────────────────────────┘     │    │
+│  │                           ▲                                           │    │
+│  │          ┌────────────────┼────────────────┐                          │    │
+│  │          │                │                │                          │    │
+│  │  ┌───────┴──────┐ ┌──────┴───────┐ ┌──────┴───────┐                  │    │
+│  │  │ OpenAIAdapter│ │AnthropicAdapt│ │  HuggingFace  │                  │    │
+│  │  │  (GPT-4o)    │ │  (Claude 3.5)│ │  (Local)      │                  │    │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘                  │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  Agent Pipeline                                                      │    │
+│  │                                                                       │    │
+│  │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐           │    │
+│  │  │ Orchestrator │───▶│  Script      │───▶│  Audio       │           │    │
+│  │  │  Agent       │    │  Agent       │    │  Agent       │           │    │
+│  │  └──────────────┘    └──────────────┘    └──────────────┘           │    │
+│  │                            │                    │                     │    │
+│  │                            ▼                    ▼                     │    │
+│  │                     ┌──────────────┐    ┌──────────────┐           │    │
+│  │                     │  Image       │    │  Caption     │           │    │
+│  │                     │  Agent       │    │  Agent       │           │    │
+│  │                     └──────────────┘    └──────────────┘           │    │
+│  │                            │                    │                     │    │
+│  │                            ▼                    ▼                     │    │
+│  │                     ┌──────────────┐    ┌──────────────┐           │    │
+│  │                     │  Animation   │    │  Video       │           │    │
+│  │                     │  Agent       │───▶│  Agent       │           │    │
+│  │                     └──────────────┘    └──────────────┘           │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  Prompt Management                                                   │    │
+│  │  ┌─────────────────────────────────────────────────────────────┐     │    │
+│  │  │  PromptRegistry                                               │     │    │
+│  │  │  ├─ get_prompt(name, version) → PromptTemplate               │     │    │
+│  │  │  ├─ register_prompt(name, template) → PromptID               │     │    │
+│  │  │  ├─ list_versions(name) → List[VersionInfo]                  │     │    │
+│  │  │  └─ get_active_version(name) → VersionInfo                   │     │    │
+│  │  └─────────────────────────────────────────────────────────────┘     │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.3 Media Pipeline Component Breakdown
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Media Pipeline                                       │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  Video Composition Engine                                            │    │
+│  │                                                                       │    │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │    │
+│  │  │  Scene       │  │  Transition  │  │  Overlay     │               │    │
+│  │  │  Planner     │─▶│  Engine      │─▶│  Engine      │               │    │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘               │    │
+│  │         │                  │                  │                       │    │
+│  │         ▼                  ▼                  ▼                       │    │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │    │
+│  │  │  Ken Burns   │  │  Text        │  │  Audio       │               │    │
+│  │  │  Processor   │  │  Overlay     │  │  Mixer       │               │    │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘               │    │
+│  │         │                  │                  │                       │    │
+│  │         └──────────────────┴──────────────────┘                       │    │
+│  │                        │                                              │    │
+│  │                        ▼                                              │    │
+│  │              ┌──────────────────┐                                     │    │
+│  │              │  FFmpeg Renderer │  ◄── GPU Acceleration (NVENC)      │    │
+│  │              │  (Subprocess)    │                                     │    │
+│  │              └──────────────────┘                                     │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  Audio Processing Pipeline                                          │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │    │
+│  │  │   TTS    │ │  Silence │ │  Volume  │ │  Mix     │ │  Format  │  │    │
+│  │  │  Generate│─▶│  Insert  │─▶│  Normal  │─▶│  BGM     │─▶│  Encode  │  │    │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  Subtitle Pipeline                                                   │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │    │
+│  │  │  Whisper │ │  Word    │ │  SRT/ASS │ │  Trans-  │ │  Burn-in │  │    │
+│  │  │  Transcr │─▶│  Align   │─▶│  Format  │─▶│  late    │─▶│  FFmpeg  │  │    │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │  Image Pipeline                                                      │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐               │    │
+│  │  │  Generate│ │  Upscale │ │  Animate  │ │  Overlay │               │    │
+│  │  │  (SD/FLUX)│─▶│  (ESRGAN)│─▶│  (Deforum)│─▶│  Text    │               │    │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘               │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 5. Deployment Architecture
+
+### 5.1 Docker Compose Topology (Development)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Docker Host                                                            │
+│                                                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
+│  │  nginx:1.25  │  │  api:latest  │  │  worker:latest│                 │
+│  │  (Gateway)   │──│  (FastAPI)   │  │  (Celery)    │                  │
+│  │  :80 → :8000 │  │  :8000       │  │  (GPU: all)  │                  │
+│  └──────────────┘  └──────┬───────┘  └──────┬───────┘                  │
+│                           │                  │                          │
+│                           ▼                  ▼                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
+│  │  postgres:16 │  │  redis:7     │  │  minio:latest│                  │
+│  │  :5432       │  │  :6379       │  │  :9000       │                  │
+│  │  (Data)      │  │  (Cache+Q)   │  │  (Storage)   │                  │
+│  └──────────────┘  └──────────────┘  └──────────────┘                  │
+│                                                                          │
+│  ┌──────────────┐  ┌──────────────┐                                     │
+│  │  flower:latest│  │  frontend    │                                     │
+│  │  (Monitor)   │  │  (Vite Dev)  │                                     │
+│  │  :5555       │  │  :5173       │                                     │
+│  └──────────────┘  └──────────────┘                                     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Production Deployment (Kubernetes)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Kubernetes Cluster                                                     │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  Ingress Controller (nginx-ingress / traefik)                    │   │
+│  │  ├─ api.shortforge.com → API Service                             │   │
+│  │  └─ app.shortforge.com → Frontend Service                        │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  ┌─────────────────────┐  ┌─────────────────────┐                       │
+│  │  API Pod (x2-4)     │  │  Frontend Pod (x2)  │                       │
+│  │  ├─ FastAPI          │  │  ├─ Nginx (static)  │                       │
+│  │  ├─ HPA (CPU > 70%) │  │  └─ React SPA       │                       │
+│  │  └─ 2GB RAM / 1 CPU │  └─ 512MB / 0.5 CPU   │                       │
+│  └─────────────────────┘  └─────────────────────┘                       │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  Worker Pods (GPU Node Pool)                                     │   │
+│  │  ├─ script-worker (x2)  ├─ audio-worker (x2)                     │   │
+│  │  ├─ image-worker (x2)   ├─ video-worker (x4)  ◄── GPU required   │   │
+│  │  ├─ caption-worker (x2) └─ publish-worker (x1)                   │   │
+│  │  └─ HPA: Queue depth > 100                                       │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  ┌─────────────────────┐  ┌─────────────────────┐                       │
+│  │  PostgreSQL (RDS)   │  │  ElastiCache (Redis)│                       │
+│  │  ├─ Multi-AZ        │  │  ├─ Cluster mode    │                       │
+│  │  └─ Read replicas   │  │  └─ 50GB memory     │                       │
+│  └─────────────────────┘  └─────────────────────┘                       │
+│                                                                          │
+│  ┌─────────────────────┐  ┌─────────────────────┐                       │
+│  │  S3 Buckets         │  │  CloudFront (CDN)   │                       │
+│  │  ├─ media-uploads   │  │  ├─ Video caching   │                       │
+│  │  ├─ generated-videos│  │  └─ Edge delivery   │                       │
+│  │  └─ thumbnails      │  └─────────────────────┘                       │
+│  └─────────────────────┘                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.3 GPU Strategy
+
+| Worker | GPU Requirement | Library | Notes |
+|--------|----------------|---------|-------|
+| Video Worker | **Required** (NVENC) | FFmpeg with CUDA | H.264/H.265 hardware encoding |
+| Image Worker | **Required** | PyTorch CUDA | Stable Diffusion / FLUX inference |
+| Animation Worker | **Required** | PyTorch CUDA | Deforum / frame interpolation |
+| Caption Worker | Optional | Whisper CUDA | Falls back to CPU (slower) |
+| Audio Worker | Not required | - | TTS is CPU-bound |
+| Script Worker | Not required | - | LLM API calls, no local GPU |
+
+---
+
+## 6. Technology Stack
+
+### 6.1 Core Stack
+
+| Layer | Technology | Version | Justification |
+|-------|-----------|---------|---------------|
+| **Backend Framework** | FastAPI | 0.115+ | Async-native, auto OpenAPI, Pydantic V2 |
+| **Python** | CPython | 3.12+ | Latest stable, performance improvements |
+| **ORM** | SQLAlchemy | 2.0+ | Async support, mature, Alembic migrations |
+| **Validation** | Pydantic | 2.0+ | Fast, integrated with FastAPI |
+| **Task Queue** | Celery | 5.4+ | Battle-tested, Redis broker, Flower monitoring |
+| **Frontend** | React | 19+ | Concurrent features, server components |
+| **Build Tool** | Vite | 6+ | Fast HMR, TypeScript-native |
+| **State** | Zustand | 5+ | Minimal boilerplate, TypeScript-first |
+| **Styling** | Tailwind CSS | 4+ | Utility-first, JIT compilation |
+
+### 6.2 AI & Media Stack
+
+| Component | Primary | Fallback | GPU Support |
+|-----------|---------|----------|-------------|
+| **LLM (Script)** | OpenAI GPT-4o | Anthropic Claude 3.5 | N/A (API) |
+| **LLM (Local)** | Ollama (Llama 3) | - | Yes (CUDA) |
+| **TTS** | ElevenLabs | Azure TTS / pyttsx3 | N/A (API) |
+| **Image Gen** | Stability AI / FLUX | Stable Diffusion XL | Yes (CUDA) |
+| **Image Upscale** | Real-ESRGAN | - | Yes (CUDA) |
+| **Animation** | Deforum SD | Frame interpolation | Yes (CUDA) |
+| **Transcription** | Whisper (large-v3) | - | Optional (CUDA) |
+| **Video Processing** | FFmpeg 7+ | MoviePy (fallback) | Yes (NVENC) |
+| **Audio Processing** | PyDub + FFmpeg | - | No |
+
+### 6.3 Infrastructure Stack
+
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| **Database** | PostgreSQL 16 | Primary data store |
+| **Cache** | Redis 7 | Session, rate limiting, Celery broker |
+| **Object Storage** | MinIO (dev) / AWS S3 (prod) | Media files |
+| **Reverse Proxy** | Nginx / Traefik | API gateway, SSL termination |
+| **Container** | Docker + Docker Compose | Local development |
+| **Orchestration** | Kubernetes (prod) | Production deployment |
+| **Monitoring** | Flower + Prometheus + Grafana | Worker & API metrics |
+| **Error Tracking** | Sentry | Exception monitoring |
+| **CI/CD** | GitHub Actions | Lint, test, build, deploy |
+
+---
+
+## 7. Cross-Cutting Concerns
+
+### 7.1 Error Handling Strategy
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Error Classification                                                   │
+│                                                                          │
+│  ┌─────────────────────┐  ┌─────────────────────┐                       │
+│  │  Recoverable        │  │  Non-Recoverable    │                       │
+│  │  ├─ API timeout     │  │  ├─ Invalid input   │                       │
+│  │  ├─ TTS failure     │  │  ├─ Auth failure    │                       │
+│  │  ├─ FFmpeg crash    │  │  ├─ DB connection   │                       │
+│  │  └─ YouTube quota   │  │  └─ Disk full       │                       │
+│  └─────────────────────┘  └─────────────────────┘                       │
+│                                                                          │
+│  Retry Policy:                                                          │
+│  ├─ Exponential backoff: base=1s, max=60s, multiplier=2                │
+│  ├─ Jitter: ±25% random                                                  │
+│  ├─ Max retries: 3 (recoverable) / 0 (non-recoverable)                 │
+│  └─ Circuit breaker: 5 failures in 60s → open for 120s                 │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 7.2 Event-Driven State Machine
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Generation Pipeline State Machine                                      │
+│                                                                          │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐          │
+│  │  PENDING │───▶│ SCRIPT   │───▶│ AUDIO    │───▶│ CAPTION  │          │
+│  │          │    │ GENERATED│    │ GENERATED│    │ GENERATED│          │
+│  └──────────┘    └──────────┘    └──────────┘    └──────────┘          │
+│       │               │               │               │                 │
+│       │               ▼               │               │                 │
+│       │         ┌──────────┐          │               │                 │
+│       │         │  SCRIPT  │          │               │                 │
+│       │         │ APPROVED │          │               │                 │
+│       │         └──────────┘          │               │                 │
+│       │               │               │               │                 │
+│       │               ▼               ▼               ▼                 │
+│       │         ┌──────────────────────────────────────────┐            │
+│       │         │         IMAGE GENERATED                  │            │
+│       │         └──────────────────────────────────────────┘            │
+│       │                           │                                     │
+│       │                           ▼                                     │
+│       │         ┌──────────────────────────────────────────┐            │
+│       │         │         ANIMATION COMPLETE               │            │
+│       │         └──────────────────────────────────────────┘            │
+│       │                           │                                     │
+│       │                           ▼                                     │
+│       │         ┌──────────────────────────────────────────┐            │
+│       │         │         VIDEO RENDERED                   │            │
+│       │         └──────────────────────────────────────────┘            │
+│       │                           │                                     │
+│       │                           ▼                                     │
+│       │         ┌──────────────────────────────────────────┐            │
+│       │         │         READY FOR REVIEW                 │            │
+│       │         └──────────────────────────────────────────┘            │
+│       │                           │                                     │
+│       │                           ▼                                     │
+│       │         ┌──────────────────────────────────────────┐            │
+│       └────────▶│         PUBLISHED / FAILED               │            │
+│                 └──────────────────────────────────────────┘            │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 7.3 Caching Strategy
+
+| Cache | Key Pattern | TTL | Invalidation |
+|-------|-------------|-----|-------------|
+| User Session | `session:{user_id}` | 24h | On logout |
+| API Rate Limit | `ratelimit:{ip}:{route}` | 1m | Automatic |
+| Project List | `projects:{user_id}:{page}` | 5m | On create/update |
+| Script Preview | `script:{script_id}` | 1h | On edit |
+| Video Status | `video:{video_id}:status` | 30s | On status change |
+| AI Response | `ai:{prompt_hash}` | 24h | Manual flush |
+| YouTube Token | `youtube:{user_id}:token` | Until expiry | On refresh |
+
+---
+
+## 8. Scalability & Performance
+
+### 8.1 Horizontal Scaling Points
+
+| Component | Scaling Strategy | Limiting Factor |
+|-----------|-----------------|-----------------|
+| API Pods | Horizontal (HPA) | Database connections |
+| Script Workers | Horizontal (queue depth) | LLM API rate limits |
+| Audio Workers | Horizontal (queue depth) | TTS API rate limits |
+| Image Workers | Horizontal (queue depth) | GPU memory |
+| Video Workers | Horizontal (queue depth) | GPU encoding slots |
+| Database | Read replicas | Write throughput |
+| Redis | Cluster mode | Memory |
+
+### 8.2 Performance Targets
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| API Response (p95) | < 200ms | Request duration |
+| Script Generation | < 10s | End-to-end |
+| TTS Generation | < 5s per 30s audio | Real-time factor |
+| Image Generation | < 15s per image | Inference time |
+| Video Render (30s) | < 60s | FFmpeg encode time |
+| Caption Burn-in | < 30s per 60s video | FFmpeg filter time |
+| Full Pipeline (60s) | < 5 min | Total generation |
+
+---
+
+## 9. Security Architecture
+
+### 9.1 Authentication & Authorization
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Auth Flow                                                               │
+│                                                                          │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐          │
+│  │  Client  │───▶│  /login  │───▶│  JWT     │───▶│  Access  │          │
+│  │          │    │          │    │  Issued  │    │  Granted │          │
+│  └──────────┘    └──────────┘    └──────────┘    └──────────┘          │
+│       │                                                                │
+│       │  ┌─────────────────────────────────────────────────────────┐   │
+│       │  │  Token Types                                            │   │
+│       │  │  ├─ Access Token: 15 min, JWT, contains user_id, role  │   │
+│       │  │  └─ Refresh Token: 7 days, opaque, stored in DB        │   │
+│       │  └─────────────────────────────────────────────────────────┘   │
+│       │                                                                │
+│       ▼                                                                │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  Authorization Levels                                           │   │
+│  │  ├─ Public: Health check, docs                                  │   │
+│  │  ├─ Authenticated: CRUD own projects, scripts, videos           │   │
+│  │  ├─ Premium: Higher rate limits, priority queue                 │   │
+│  │  └─ Admin: User management, system config, worker monitoring   │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 9.2 Data Protection
+
+| Concern | Measure |
+|---------|---------|
+| **In Transit** | TLS 1.3 for all external traffic |
+| **At Rest** | AES-256 encryption for media files |
+| **Secrets** | Environment variables (never in code) |
+| **API Keys** | Hashed with bcrypt before storage |
+| **YouTube Tokens** | Encrypted at rest with Fernet |
+| **Input Validation** | Pydantic schemas on all endpoints |
+| **Rate Limiting** | 100 req/min per user, 1000 req/min per IP |
+| **CORS** | Whitelist of allowed origins |
+
+---
+
+## 10. Observability
+
+### 10.1 Logging Strategy
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Log Levels & Structure                                                 │
+│                                                                          │
+│  Structured JSON logging:                                                │
+│  {                                                                       │
+│    "timestamp": "2026-07-02T04:00:00Z",                                 │
+│    "level": "INFO",                                                      │
+│    "service": "api",                                                     │
+│    "trace_id": "abc-123-def",                                            │
+│    "user_id": "user_456",                                                │
+│    "message": "Script generation started",                               │
+│    "duration_ms": 1234,                                                  │
+│    "metadata": { "script_id": "scr_789", "model": "gpt-4o" }            │
+│  }                                                                       │
+│                                                                          │
+│  Levels: DEBUG (dev) → INFO (prod) → WARNING → ERROR → CRITICAL        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 10.2 Metrics & Monitoring
+
+| Metric | Source | Alert Threshold |
+|--------|--------|-----------------|
+| API Request Rate | Prometheus | > 1000 req/s |
+| API p95 Latency | Prometheus | > 500ms |
+| Error Rate (5xx) | Prometheus | > 1% |
+| Queue Depth | Celery/Redis | > 500 tasks |
+| Worker Failure Rate | Celery/Flower | > 5% |
+| GPU Utilization | DCGM Exporter | > 90% for 5min |
+| Disk Usage | Node Exporter | > 85% |
+| DB Connection Pool | PostgreSQL | > 80% utilized |
+
+### 10.3 Distributed Tracing
+
+- **Tool**: OpenTelemetry + Jaeger
+- **Trace every request**: API → Use Case → Infrastructure → External Service
+- **Sampling**: 100% for errors, 10% for successful requests
+- **Key spans**: DB queries, AI API calls, FFmpeg processes, Celery tasks
+
+---
+
+## Appendix A: Architecture Decision Records
+
+### ADR-001: Why FastAPI over Django/Flask
+- **Context**: Need async support for long-polling and concurrent connections
+- **Decision**: FastAPI — native async, auto-generated OpenAPI, Pydantic integration
+- **Consequence**: Smaller ecosystem than Django, but better performance for our use case
+
+### ADR-002: Why Celery over Argo/Temporal
+- **Context**: Need simple task queue with Python-native workers
+- **Decision**: Celery — mature, Redis broker, Flower monitoring, simple setup
+- **Consequence**: Less sophisticated workflow orchestration, but sufficient for linear pipeline
+
+### ADR-003: Why FFmpeg subprocess over pure Python
+- **Context**: Video processing is CPU/GPU intensive
+- **Decision**: FFmpeg via subprocess — most reliable, GPU acceleration (NVENC), battle-tested
+- **Consequence**: More complex error handling, but best performance and format support
+
+### ADR-004: Why Provider Abstraction for AI
+- **Context**: Multiple AI providers with different APIs and capabilities
+- **Decision**: Strategy pattern with `IAIService` interface — swap providers without changing business logic
+- **Consequence**: Slight indirection overhead, but enables easy provider switching and A/B testing
+
+---
+
+## Appendix B: Glossary
+
+| Term | Definition |
+|------|------------|
+| **Project** | A container for a Shorts generation (topic, settings, status) |
+| **Script** | Generated text content with scene breakdown, hook, body, CTA |
+| **Voiceover** | TTS-generated audio file with timing metadata |
+| **Scene** | A segment of the video with its own background, text, and duration |
+| **Job** | A Celery task representing a step in the generation pipeline |
+| **Provider** | An external AI service (OpenAI, ElevenLabs, Stability AI) |
+| **Agent** | A specialized component that handles one stage of generation |
+| **Orchestrator** | The coordinator that manages the pipeline state machine |
