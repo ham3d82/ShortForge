@@ -45,7 +45,11 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(AppException)
     async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
-        request_id = request_id_contextvar.get()
+        request_id = getattr(
+    request.state,
+    "request_id",
+    request_id_contextvar.get(),
+)
         logger.warning(
             "Application exception",
             extra={
@@ -71,7 +75,11 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-        request_id = request_id_contextvar.get()
+        request_id = getattr(
+    request.state,
+    "request_id",
+    request_id_contextvar.get(),
+)
         logger.warning(
             "HTTP exception",
             extra={
@@ -97,7 +105,11 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-        request_id = request_id_contextvar.get()
+        request_id = getattr(
+    request.state,
+    "request_id",
+    request_id_contextvar.get(),
+)
         logger.warning(
             "Request validation error",
             extra={
@@ -123,7 +135,11 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        request_id = request_id_contextvar.get()
+        request_id = getattr(
+    request.state,
+    "request_id",
+    request_id_contextvar.get(),
+)
         logger.exception(
             "Unhandled exception",
             extra={
