@@ -39,7 +39,13 @@ class Settings(BaseSettings):
 
     # API
     API_V1_PREFIX: str = "/api/v1"
+    # AI Provider
+    AI_PROVIDER: str = "gemini"
 
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    AI_TIMEOUT: int = 60
     # Paths
     PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent.parent
 
@@ -64,6 +70,21 @@ class Settings(BaseSettings):
     def validate_port(cls, v: int) -> int:
         if not (1 <= v <= 65535):
             raise ValueError("PORT must be between 1 and 65535")
+        return v
+
+    @field_validator("AI_PROVIDER")
+    @classmethod
+    def validate_ai_provider(cls, v: str) -> str:
+        allowed = {"gemini"}
+        if v.lower() not in allowed:
+            raise ValueError(f"AI_PROVIDER must be one of {allowed}")
+        return v.lower()
+
+    @field_validator("AI_TIMEOUT")
+    @classmethod
+    def validate_ai_timeout(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("AI_TIMEOUT must be greater than 0")
         return v
 
     model_config = SettingsConfigDict(
