@@ -7,7 +7,9 @@ All AI providers (Gemini, OpenAI, etc.) must implement this interface.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Type
+
+from pydantic import BaseModel
 
 
 class AIProvider(ABC):
@@ -25,24 +27,22 @@ class AIProvider(ABC):
         prompt: str,
         **kwargs: Any,
     ) -> str:
+        """Generate plain text."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def generate_structured(
+        self,
+        prompt: str,
+        schema: Type[BaseModel],
+        **kwargs: Any,
+    ) -> BaseModel:
         """
-        Generate a text response from the given prompt.
-
-        Args:
-            prompt: User prompt.
-            **kwargs: Provider-specific options.
-
-        Returns:
-            Generated text.
+        Generate structured data validated against a Pydantic schema.
         """
         raise NotImplementedError
 
     @abstractmethod
     async def health_check(self) -> bool:
-        """
-        Verify the provider is available.
-
-        Returns:
-            True if healthy.
-        """
+        """Verify the provider is available."""
         raise NotImplementedError

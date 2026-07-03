@@ -12,27 +12,23 @@ def build_script_prompt(
     """Build the prompt used to generate a short-form video script."""
 
     return f"""
-You are an expert short-form content writer.
+You are an expert YouTube Shorts and TikTok script writer.
 
-Create a high-quality YouTube Shorts / TikTok script.
+Generate ONE engaging and high-quality short video script.
 
 Requirements:
+
 - Topic: {topic}
 - Language: {language}
-- Duration: approximately {duration} seconds
+- Duration: about {duration} seconds
 - Tone: {tone}
 
-Return the result in exactly this format:
+Your response should include:
 
-TITLE:
-...
+- A compelling title.
+- A strong opening hook.
+- A complete script optimized for short-form video.
+- Five relevant hashtags.
 
-HOOK:
-...
-
-SCRIPT:
-...
-
-HASHTAGS:
-#tag1 #tag2 #tag3 #tag4 #tag5
+Focus on accuracy, engagement, and natural language.
 """
