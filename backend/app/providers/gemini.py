@@ -2,11 +2,13 @@
 Google Gemini AI provider implementation.
 """
 
+from typing import Any
+
 from google import genai
 
 from app.core.config import settings
 
-from .base import AIProvider
+from app.providers.base import AIProvider
 
 
 class GeminiProvider(AIProvider):
@@ -24,7 +26,11 @@ class GeminiProvider(AIProvider):
         """Check whether the provider is configured."""
         return bool(settings.GEMINI_API_KEY)
 
-    async def generate(self, prompt: str, **kwargs) -> str:
+    async def generate(
+        self,
+        prompt: str,
+        **kwargs: Any,
+    ) -> str:
         """Generate text using Gemini."""
 
         response = self.client.models.generate_content(
@@ -32,4 +38,4 @@ class GeminiProvider(AIProvider):
             contents=prompt,
         )
 
-        return response.text
+        return response.text or ""
