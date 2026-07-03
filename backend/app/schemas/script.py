@@ -21,3 +21,10 @@ class ScriptGenerateResponse(BaseModel):
     hook: str
     script: str
     hashtags: list[str]
+
+    thumbnail_prompt: str
+
+    image_prompts: list[str] = Field(
+        min_length=4,
+        max_length=8,
+    )

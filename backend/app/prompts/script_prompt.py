@@ -12,23 +12,48 @@ def build_script_prompt(
     """Build the prompt used to generate a short-form video script."""
 
     return f"""
-You are an expert YouTube Shorts and TikTok script writer.
+You are an expert viral content creator specializing in YouTube Shorts, TikTok, and Instagram Reels.
 
-Generate ONE engaging and high-quality short video script.
+Generate a complete short-form content package.
+
+Topic:
+{topic}
+
+Language:
+{language}
+
+Duration:
+Approximately {duration} seconds.
+
+Tone:
+{tone}
 
 Requirements:
 
-- Topic: {topic}
-- Language: {language}
-- Duration: about {duration} seconds
-- Tone: {tone}
+- Create a short, memorable title.
+- Write an attention-grabbing hook within the first 3 seconds.
+- Generate a complete script that keeps viewers engaged until the end.
+- End with a subtle call-to-action when appropriate.
+- Generate exactly 5 relevant hashtags.
+- Generate one detailed thumbnail image prompt.
+- Generate 4 cinematic image prompts representing different scenes from the script.
 
-Your response should include:
+Thumbnail Prompt Requirements:
 
-- A compelling title.
-- A strong opening hook.
-- A complete script optimized for short-form video.
-- Five relevant hashtags.
+- Highly detailed
+- Cinematic lighting
+- Photorealistic
+- Eye-catching
+- Suitable for YouTube thumbnail
 
-Focus on accuracy, engagement, and natural language.
+Image Prompt Requirements:
+
+- One prompt per major scene
+- Photorealistic
+- Cinematic
+- Rich in visual details
+- No text inside images
+- Safe for AI image generation
+
+The content should be educational, engaging, and optimized for maximum audience retention.
 """

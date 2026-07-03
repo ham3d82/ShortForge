@@ -8,24 +8,39 @@ Provides typed access to all configuration values.
 import sys
 from pathlib import Path
 
-from pydantic import field_validator, ValidationError
+from pydantic import ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
+    # ------------------------------------------------------------------
     # Application
+    # ------------------------------------------------------------------
+
     APP_NAME: str = "ShortForge"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
     ENVIRONMENT: str = "development"
 
+    # ------------------------------------------------------------------
     # Server
+    # ------------------------------------------------------------------
+
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
+    # ------------------------------------------------------------------
+    # API
+    # ------------------------------------------------------------------
+
+    API_V1_PREFIX: str = "/api/v1"
+
+    # ------------------------------------------------------------------
     # CORS
+    # ------------------------------------------------------------------
+
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
@@ -33,21 +48,39 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
     ]
 
+    # ------------------------------------------------------------------
     # Logging
+    # ------------------------------------------------------------------
+
     LOG_LEVEL: str = "DEBUG"
     LOG_FORMAT: str = "console"
 
-    # API
-    API_V1_PREFIX: str = "/api/v1"
-    # AI Provider
+    # ------------------------------------------------------------------
+    # AI
+    # ------------------------------------------------------------------
+
     AI_PROVIDER: str = "gemini"
 
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
     AI_TIMEOUT: int = 60
+
+    # ------------------------------------------------------------------
+    # Database
+    # ------------------------------------------------------------------
+
+    DATABASE_URL: str = "sqlite:///./shortforge.db"
+
+    # ------------------------------------------------------------------
     # Paths
+    # ------------------------------------------------------------------
+
     PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent.parent
+
+    # ------------------------------------------------------------------
+    # Validators
+    # ------------------------------------------------------------------
 
     @field_validator("ENVIRONMENT")
     @classmethod
