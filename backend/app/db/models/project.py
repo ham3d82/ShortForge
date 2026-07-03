@@ -5,6 +5,7 @@ Project database model.
 from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -41,6 +42,12 @@ class Project(Base):
         nullable=False,
     )
 
+    status: Mapped[str] = mapped_column(
+        String(50),
+        default="script_generated",
+        nullable=False,
+    )
+
     title: Mapped[str] = mapped_column(
         String(300),
         nullable=False,
@@ -56,8 +63,8 @@ class Project(Base):
         nullable=False,
     )
 
-    hashtags: Mapped[str] = mapped_column(
-        Text,
+    hashtags: Mapped[list[str]] = mapped_column(
+        JSONB,
         nullable=False,
     )
 
@@ -66,13 +73,13 @@ class Project(Base):
         nullable=False,
     )
 
-    image_prompts: Mapped[str] = mapped_column(
-        Text,
+    image_prompts: Mapped[list[str]] = mapped_column(
+        JSONB,
         nullable=False,
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=datetime.utcnow,
         nullable=False,
     )

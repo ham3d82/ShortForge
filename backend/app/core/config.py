@@ -70,7 +70,14 @@ class Settings(BaseSettings):
     # Database
     # ------------------------------------------------------------------
 
-    DATABASE_URL: str = "sqlite:///./shortforge.db"
+    # Async connection (FastAPI)
+    DATABASE_URL: str
+
+    # Sync connection (Alembic)
+    DATABASE_SYNC_URL: str
+
+    # Redis
+    REDIS_URL: str
 
     # ------------------------------------------------------------------
     # Paths
