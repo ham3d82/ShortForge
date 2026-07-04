@@ -61,22 +61,46 @@ class Settings(BaseSettings):
 
     AI_PROVIDER: str = "gemini"
 
-    GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
-
     AI_TIMEOUT: int = 60
+
+    # ------------------------------------------------------------------
+    # Gemini
+    # ------------------------------------------------------------------
+
+    GEMINI_API_KEY: str = ""
+
+    GEMINI_TEXT_MODEL: str = "gemini-2.5-flash"
+
+    GEMINI_IMAGE_MODEL: str = "imagen-4.0-generate-001"
+
+    # ------------------------------------------------------------------
+    # OpenAI
+    # ------------------------------------------------------------------
+
+    OPENAI_API_KEY: str = ""
+
+    OPENAI_TEXT_MODEL: str = "gpt-5"
+
+    OPENAI_IMAGE_MODEL: str = "gpt-image-1"
+
+    # ------------------------------------------------------------------
+    # OpenRouter
+    # ------------------------------------------------------------------
+
+    OPENROUTER_API_KEY: str = ""
+
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+
+    OPENROUTER_TEXT_MODEL: str = ""
 
     # ------------------------------------------------------------------
     # Database
     # ------------------------------------------------------------------
 
-    # Async connection (FastAPI)
     DATABASE_URL: str
 
-    # Sync connection (Alembic)
     DATABASE_SYNC_URL: str
 
-    # Redis
     REDIS_URL: str
 
     # ------------------------------------------------------------------
@@ -93,16 +117,20 @@ class Settings(BaseSettings):
     @classmethod
     def validate_environment(cls, v: str) -> str:
         allowed = {"development", "testing", "production"}
+
         if v.lower() not in allowed:
             raise ValueError(f"ENVIRONMENT must be one of {allowed}")
+
         return v.lower()
 
     @field_validator("LOG_LEVEL")
     @classmethod
     def validate_log_level(cls, v: str) -> str:
         allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+
         if v.upper() not in allowed:
             raise ValueError(f"LOG_LEVEL must be one of {allowed}")
+
         return v.upper()
 
     @field_validator("PORT")
@@ -110,14 +138,21 @@ class Settings(BaseSettings):
     def validate_port(cls, v: int) -> int:
         if not (1 <= v <= 65535):
             raise ValueError("PORT must be between 1 and 65535")
+
         return v
 
     @field_validator("AI_PROVIDER")
     @classmethod
     def validate_ai_provider(cls, v: str) -> str:
-        allowed = {"gemini"}
+        allowed = {
+            "gemini",
+            "openai",
+            "openrouter",
+        }
+
         if v.lower() not in allowed:
             raise ValueError(f"AI_PROVIDER must be one of {allowed}")
+
         return v.lower()
 
     @field_validator("AI_TIMEOUT")
@@ -125,6 +160,7 @@ class Settings(BaseSettings):
     def validate_ai_timeout(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("AI_TIMEOUT must be greater than 0")
+
         return v
 
     model_config = SettingsConfigDict(
@@ -137,6 +173,11 @@ class Settings(BaseSettings):
 
 try:
     settings = Settings()
+
 except ValidationError as exc:
-    print(f"Configuration validation failed:\n{exc}", file=sys.stderr)
+    print(
+        f"Configuration validation failed:\n{exc}",
+        file=sys.stderr,
+    )
+
     sys.exit(1)

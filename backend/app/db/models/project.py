@@ -6,7 +6,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -82,4 +82,10 @@ class Project(Base):
         DateTime(timezone=True),
         default=datetime.utcnow,
         nullable=False,
+    )
+
+    generated_images = relationship(
+        "GeneratedImage",
+        back_populates="project",
+        cascade="all, delete-orphan",
     )

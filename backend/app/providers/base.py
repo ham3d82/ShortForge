@@ -43,6 +43,17 @@ class AIProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def generate_image(
+        self,
+        prompt: str,
+        **kwargs: Any,
+    ) -> str:
+        """
+        Generate a single image and return its URL or local path.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     async def health_check(self) -> bool:
         """Verify the provider is available."""
         raise NotImplementedError

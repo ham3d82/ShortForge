@@ -39,6 +39,15 @@ class AIService:
             schema=schema,
         )
 
+    async def generate_image(
+        self,
+        prompt: str,
+    ) -> str:
+        """Generate a single image."""
+        return await self.provider.generate_image(
+            prompt=prompt,
+        )
+
     async def health_check(self) -> bool:
         """Check provider health."""
         return await self.provider.health_check()

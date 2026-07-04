@@ -9,6 +9,7 @@ from app.db.base import Base
 
 # IMPORTANT:
 # Import all SQLAlchemy models here so Alembic can detect them.
+from app.db.models.generated_image import GeneratedImage  # noqa: F401
 from app.db.models.project import Project  # noqa: F401
 
 config = context.config
