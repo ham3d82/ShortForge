@@ -1,17 +1,17 @@
 """
-Google Gemini AI provider implementation.
+Google Gemini text provider implementation.
 """
 
 from google import genai
+from pydantic import BaseModel
 
 from app.core.config import settings
-from app.providers.base import AIProvider
-from app.providers.gemini_provider.image import GeminiImageGenerator
 from app.providers.gemini_provider.text import GeminiTextGenerator
+from app.providers.text.base import TextProvider
 
 
-class GeminiProvider(AIProvider):
-    """Google Gemini provider."""
+class GeminiProvider(TextProvider):
+    """Google Gemini text provider."""
 
     @property
     def provider_name(self) -> str:
@@ -25,11 +25,6 @@ class GeminiProvider(AIProvider):
         self.text = GeminiTextGenerator(
             client=self.client,
             model=settings.GEMINI_TEXT_MODEL,
-        )
-
-        self.image = GeminiImageGenerator(
-            client=self.client,
-            model=settings.GEMINI_IMAGE_MODEL,
         )
 
     async def generate(
@@ -48,9 +43,9 @@ class GeminiProvider(AIProvider):
     async def generate_structured(
         self,
         prompt: str,
-        schema,
+        schema: type[BaseModel],
         **kwargs,
-    ):
+    ) -> BaseModel:
         """
         Generate structured output.
         """
@@ -58,19 +53,6 @@ class GeminiProvider(AIProvider):
         return await self.text.generate_structured(
             prompt=prompt,
             schema=schema,
-        )
-
-    async def generate_image(
-        self,
-        prompt: str,
-        **kwargs,
-    ) -> str:
-        """
-        Generate an image.
-        """
-
-        return await self.image.generate_image(
-            prompt=prompt,
         )
 
     async def health_check(

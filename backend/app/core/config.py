@@ -61,6 +61,8 @@ class Settings(BaseSettings):
 
     AI_PROVIDER: str = "gemini"
 
+    IMAGE_PROVIDER: str = "pollinations"
+
     AI_TIMEOUT: int = 60
 
     # ------------------------------------------------------------------
@@ -72,6 +74,12 @@ class Settings(BaseSettings):
     GEMINI_TEXT_MODEL: str = "gemini-2.5-flash"
 
     GEMINI_IMAGE_MODEL: str = "imagen-4.0-generate-001"
+
+    # ------------------------------------------------------------------
+    # Pollinations
+    # ------------------------------------------------------------------
+
+    POLLINATIONS_BASE_URL: str = "https://image.pollinations.ai/prompt"
 
     # ------------------------------------------------------------------
     # OpenAI
@@ -108,6 +116,8 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
 
     PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent.parent
+
+    GENERATED_IMAGES_DIR: Path = PROJECT_ROOT / "generated_images"
 
     # ------------------------------------------------------------------
     # Validators
@@ -152,6 +162,19 @@ class Settings(BaseSettings):
 
         if v.lower() not in allowed:
             raise ValueError(f"AI_PROVIDER must be one of {allowed}")
+
+        return v.lower()
+
+    @field_validator("IMAGE_PROVIDER")
+    @classmethod
+    def validate_image_provider(cls, v: str) -> str:
+        allowed = {
+            "pollinations",
+            "gemini",
+        }
+
+        if v.lower() not in allowed:
+            raise ValueError(f"IMAGE_PROVIDER must be one of {allowed}")
 
         return v.lower()
 

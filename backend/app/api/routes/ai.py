@@ -16,7 +16,7 @@ async def ai_health(
     ai: AIService = Depends(get_ai_service),
 ):
     return {
-        "provider": ai.provider.provider_name,
+        "provider": ai.text_provider.provider_name,
         "healthy": await ai.health_check(),
     }
 
@@ -29,7 +29,7 @@ async def generate_text(
     request: GenerateRequest,
     ai: AIService = Depends(get_ai_service),
 ) -> GenerateResponse:
-    """Generate text using the configured AI provider."""
+    """Generate text using the configured text provider."""
 
     text = await ai.generate(request.prompt)
 

@@ -19,15 +19,18 @@ class GeminiImageGenerator:
     async def generate_image(
         self,
         prompt: str,
-    ) -> str:
+    ):
         """
         Generate an image from a prompt.
 
-        NOTE:
-        This method will be implemented after the provider
-        refactor is completed.
+        Returns:
+            The raw Gemini response. Saving the image is handled
+            by the image service.
         """
 
-        raise NotImplementedError(
-            "Image generation is not implemented yet."
+        response = self.client.models.generate_images(
+            model=self.model,
+            prompt=prompt,
         )
+
+        return response

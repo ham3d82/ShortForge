@@ -2,14 +2,14 @@
 AI service.
 
 Provides a single interface for the rest of the application
-to communicate with the configured AI provider.
+to communicate with the configured text provider.
 """
 
 from typing import Type
 
 from pydantic import BaseModel
 
-from app.providers.base import AIProvider
+from app.providers.text.base import TextProvider
 
 
 class AIService:
@@ -17,16 +17,19 @@ class AIService:
 
     def __init__(
         self,
-        provider: AIProvider,
+        text_provider: TextProvider,
     ) -> None:
-        self.provider = provider
+        self.text_provider = text_provider
 
     async def generate(
         self,
         prompt: str,
     ) -> str:
         """Generate plain text."""
-        return await self.provider.generate(prompt)
+
+        return await self.text_provider.generate(
+            prompt=prompt,
+        )
 
     async def generate_structured(
         self,
@@ -34,20 +37,13 @@ class AIService:
         schema: Type[BaseModel],
     ) -> BaseModel:
         """Generate structured output."""
-        return await self.provider.generate_structured(
+
+        return await self.text_provider.generate_structured(
             prompt=prompt,
             schema=schema,
         )
 
-    async def generate_image(
-        self,
-        prompt: str,
-    ) -> str:
-        """Generate a single image."""
-        return await self.provider.generate_image(
-            prompt=prompt,
-        )
-
     async def health_check(self) -> bool:
         """Check provider health."""
-        return await self.provider.health_check()
+
+        return await self.text_provider.health_check()
