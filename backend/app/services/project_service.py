@@ -6,7 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.project import Project
 from app.repositories.project_repository import ProjectRepository
-from app.schemas.project import ProjectCreate
+from app.schemas.project import (
+    ProjectCreate,
+    ProjectStatusUpdate,
+)
 
 
 class ProjectService:
@@ -36,7 +39,10 @@ class ProjectService:
 
         return await self.repository.create(project)
 
-    async def get_by_id(self, project_id: int) -> Project | None:
+    async def get_by_id(
+        self,
+        project_id: int,
+    ) -> Project | None:
         """
         Get a project by its ID.
         """
@@ -48,14 +54,33 @@ class ProjectService:
         """
         return await self.repository.list()
 
-    async def delete(self, project: Project) -> None:
+    async def delete(
+        self,
+        project: Project,
+    ) -> None:
         """
         Delete a project.
         """
         await self.repository.delete(project)
 
-    async def update(self) -> None:
+    async def update(
+        self,
+        project: Project,
+    ) -> Project:
         """
-        Commit pending changes.
+        Persist pending changes.
         """
-        await self.repository.update()
+        return await self.repository.update(project)
+
+    async def update_status(
+        self,
+        project: Project,
+        data: ProjectStatusUpdate,
+    ) -> Project:
+        """
+        Update project status.
+        """
+
+        project.status = data.status
+
+        return await self.repository.update(project)

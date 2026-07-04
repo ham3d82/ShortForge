@@ -28,6 +28,15 @@ class ProjectCreate(BaseModel):
     status: str = "script_generated"
 
 
+class ProjectStatusUpdate(BaseModel):
+    """Data required to update project status."""
+
+    status: str = Field(
+        ...,
+        examples=["images_generated"],
+    )
+
+
 class ProjectResponse(BaseModel):
     """Project returned by the API."""
 

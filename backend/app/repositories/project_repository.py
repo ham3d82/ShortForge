@@ -54,10 +54,18 @@ class ProjectRepository:
         Delete a project.
         """
         await self.db.delete(project)
+
         await self.db.commit()
 
-    async def update(self) -> None:
+    async def update(
+        self,
+        project: Project,
+    ) -> Project:
         """
-        Commit pending changes.
+        Commit pending changes and refresh the project.
         """
         await self.db.commit()
+
+        await self.db.refresh(project)
+
+        return project
