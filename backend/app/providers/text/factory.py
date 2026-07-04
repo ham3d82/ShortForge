@@ -7,12 +7,12 @@ Creates and returns the configured text provider.
 from collections.abc import Callable
 
 from app.core.config import settings
-from app.providers.gemini_provider.provider import GeminiProvider
 from app.providers.text.base import TextProvider
+from app.providers.text.gemini import GeminiTextProvider
 
 
 TEXT_PROVIDERS: dict[str, Callable[[], TextProvider]] = {
-    "gemini": GeminiProvider,
+    "gemini": GeminiTextProvider,
 }
 
 
