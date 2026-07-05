@@ -8,6 +8,7 @@ registers routes, and sets up exception handlers.
 import logging
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.config import settings
@@ -23,8 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 def create_application() -> FastAPI:
-    """Create and configure the FastAPI application."""
-
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
@@ -39,7 +38,17 @@ def create_application() -> FastAPI:
 
     register_exception_handlers(app)
 
-    app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(
+        api_router,
+        prefix=settings.API_V1_PREFIX,
+    )
+
+    # Serve generated images
+    app.mount(
+        "/generated_images",
+        StaticFiles(directory=settings.GENERATED_IMAGES_DIR),
+        name="generated_images",
+    )
 
     logger.info(
         "Application initialized",
@@ -59,11 +68,9 @@ app = create_application()
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    """Application startup hook."""
     logger.info("Application startup complete")
 
 
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
-    """Application shutdown hook."""
     logger.info("Application shutting down")
