@@ -16,6 +16,8 @@ from app.core.logging import configure_logging
 from app.middleware.cors import configure_cors
 from app.middleware.request_id import RequestIDMiddleware
 
+print("========== IMPORTS FINISHED ==========")
+
 # Configure logging before anything else
 configure_logging()
 
@@ -23,11 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 def create_application() -> FastAPI:
-    """Create and configure the FastAPI application.
+    print("1 - create_application")
 
-    Returns:
-        FastAPI: Configured application instance.
-    """
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
@@ -36,15 +35,23 @@ def create_application() -> FastAPI:
         openapi_url=f"{settings.API_V1_PREFIX}/openapi.json" if settings.DEBUG else None,
     )
 
-    # Configure middleware
+    print("2 - FastAPI created")
+
     app.add_middleware(RequestIDMiddleware)
+
+    print("3 - RequestID middleware added")
+
     configure_cors(app)
 
-    # Register exception handlers
+    print("4 - CORS configured")
+
     register_exception_handlers(app)
 
-    # Register routers
+    print("5 - Exception handlers registered")
+
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+    print("6 - Routers registered")
 
     logger.info(
         "Application initialized",
@@ -56,19 +63,23 @@ def create_application() -> FastAPI:
         },
     )
 
+    print("7 - Returning app")
+
     return app
 
 
 app = create_application()
 
+print("8 - App instance created")
+
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    """Run actions on application startup."""
+    print("9 - Startup event")
     logger.info("Application startup complete")
 
 
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
-    """Run actions on application shutdown."""
+    print("10 - Shutdown event")
     logger.info("Application shutting down")
