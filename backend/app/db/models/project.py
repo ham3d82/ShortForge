@@ -84,8 +84,14 @@ class Project(Base):
         nullable=False,
     )
 
-    generated_images = relationship(
+    generated_images: Mapped[list["GeneratedImage"]] = relationship(
         "GeneratedImage",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+
+    generated_audio: Mapped[list["GeneratedAudio"]] = relationship(
+        "GeneratedAudio",
         back_populates="project",
         cascade="all, delete-orphan",
     )

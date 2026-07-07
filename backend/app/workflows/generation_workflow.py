@@ -8,6 +8,7 @@ from app.schemas.script import ScriptGenerateRequest
 
 from app.services.image_service import ImageService
 from app.services.script_service import ScriptService
+from app.services.speech_service import SpeechService
 
 
 class GenerationWorkflow:
@@ -19,9 +20,11 @@ class GenerationWorkflow:
         self,
         script_service: ScriptService,
         image_service: ImageService,
+        speech_service: SpeechService,
     ) -> None:
         self.script_service = script_service
         self.image_service = image_service
+        self.speech_service = speech_service
 
     async def generate(
         self,
@@ -31,13 +34,22 @@ class GenerationWorkflow:
         Generate a complete project.
         """
 
-        project = await self.script_service.generate(request)
+        project = await self.script_service.generate(
+            request,
+        )
 
         image_result = await self.image_service.generate(
             project_id=project.id,
         )
 
+        speech_result = await self.speech_service.generate(
+            project_id=project.id,
+        )
+
         return ProjectGenerationResponse(
-            project=ProjectResponse.model_validate(project),
+            project=ProjectResponse.model_validate(
+                project,
+            ),
             images=image_result.images,
+            audio=speech_result.audio,
         )
