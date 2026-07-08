@@ -95,3 +95,10 @@ class Project(Base):
         back_populates="project",
         cascade="all, delete-orphan",
     )
+
+    generated_video: Mapped["GeneratedVideo | None"] = relationship(
+        "GeneratedVideo",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )

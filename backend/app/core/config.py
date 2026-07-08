@@ -75,6 +75,8 @@ class Settings(BaseSettings):
 
     SPEECH_PROVIDER: str = "gtts"
 
+    VIDEO_PROVIDER: str = "moviepy"
+
     AI_TIMEOUT: int = 60
 
     # ==========================================================
@@ -124,6 +126,16 @@ class Settings(BaseSettings):
     GTTS_DEFAULT_LANGUAGE: str = "en"
 
     # ==========================================================
+    # Video
+    # ==========================================================
+
+    VIDEO_OUTPUT_FORMAT: str = "mp4"
+
+    VIDEO_RESOLUTION: str = "1080x1920"
+
+    VIDEO_FPS: int = 30
+
+    # ==========================================================
     # Database
     # ==========================================================
 
@@ -149,6 +161,10 @@ class Settings(BaseSettings):
 
     GENERATED_AUDIO_DIR: Path = (
         PROJECT_ROOT / "generated_audio"
+    )
+
+    GENERATED_VIDEOS_DIR: Path = (
+        PROJECT_ROOT / "generated_videos"
     )
 
     # ==========================================================
@@ -261,6 +277,23 @@ class Settings(BaseSettings):
 
         return value.lower()
 
+    @field_validator("VIDEO_PROVIDER")
+    @classmethod
+    def validate_video_provider(
+        cls,
+        value: str,
+    ) -> str:
+        allowed = {
+            "moviepy",
+        }
+
+        if value.lower() not in allowed:
+            raise ValueError(
+                f"VIDEO_PROVIDER must be one of {allowed}"
+            )
+
+        return value.lower()
+
     @field_validator("AI_TIMEOUT")
     @classmethod
     def validate_ai_timeout(
@@ -270,6 +303,19 @@ class Settings(BaseSettings):
         if value <= 0:
             raise ValueError(
                 "AI_TIMEOUT must be greater than 0"
+            )
+
+        return value
+
+    @field_validator("VIDEO_FPS")
+    @classmethod
+    def validate_video_fps(
+        cls,
+        value: int,
+    ) -> int:
+        if value <= 0:
+            raise ValueError(
+                "VIDEO_FPS must be greater than 0"
             )
 
         return value

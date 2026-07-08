@@ -4,10 +4,12 @@ Database models package.
 
 from app.db.models.generated_audio import GeneratedAudio
 from app.db.models.generated_image import GeneratedImage
+from app.db.models.generated_video import GeneratedVideo
 from app.db.models.project import Project
 
 __all__ = [
     "Project",
     "GeneratedImage",
     "GeneratedAudio",
+    "GeneratedVideo",
 ]

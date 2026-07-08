@@ -31,9 +31,9 @@ class GeneratedAudioRepository:
     async def get_by_project_id(
         self,
         project_id: int,
-    ) -> list[GeneratedAudio]:
+    ) -> GeneratedAudio | None:
         """
-        Return all generated audio for a project.
+        Return the generated audio for a project.
         """
         stmt = (
             select(GeneratedAudio)
@@ -41,26 +41,26 @@ class GeneratedAudioRepository:
                 GeneratedAudio.project_id == project_id,
             )
             .order_by(
-                GeneratedAudio.created_at,
+                GeneratedAudio.created_at.desc(),
             )
         )
 
-        result = await self.db.scalars(stmt)
-
-        return list(result)
+        return await self.db.scalar(stmt)
 
     async def delete_by_project_id(
         self,
         project_id: int,
     ) -> None:
         """
-        Delete all generated audio for a project.
+        Delete the generated audio for a project.
         """
-        audio_files = await self.get_by_project_id(
+        audio = await self.get_by_project_id(
             project_id,
         )
 
-        for audio in audio_files:
-            await self.db.delete(audio)
+        if audio is None:
+            return
+
+        await self.db.delete(audio)
 
         await self.db.commit()

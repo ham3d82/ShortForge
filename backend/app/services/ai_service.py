@@ -5,6 +5,7 @@ Provides a single interface for the rest of the application
 to communicate with the configured AI providers.
 """
 
+from pathlib import Path
 from typing import Type
 
 from pydantic import BaseModel
@@ -12,6 +13,7 @@ from pydantic import BaseModel
 from app.providers.image.base import ImageProvider
 from app.providers.speech.base import BaseSpeechProvider
 from app.providers.text.base import TextProvider
+from app.providers.video.base import BaseVideoProvider
 
 
 class AIService:
@@ -22,10 +24,12 @@ class AIService:
         text_provider: TextProvider,
         image_provider: ImageProvider,
         speech_provider: BaseSpeechProvider,
+        video_provider: BaseVideoProvider,
     ) -> None:
         self.text_provider = text_provider
         self.image_provider = image_provider
         self.speech_provider = speech_provider
+        self.video_provider = video_provider
 
     async def generate(
         self,
@@ -69,6 +73,22 @@ class AIService:
         return await self.speech_provider.generate(
             text=text,
             language=language,
+        )
+
+    async def generate_video(
+        self,
+        image_paths: list[str],
+        audio_path: str,
+        output_path: Path,
+    ) -> Path:
+        """
+        Generate a video.
+        """
+
+        return await self.video_provider.generate(
+            image_paths=image_paths,
+            audio_path=audio_path,
+            output_path=output_path,
         )
 
     async def health_check(self) -> bool:
